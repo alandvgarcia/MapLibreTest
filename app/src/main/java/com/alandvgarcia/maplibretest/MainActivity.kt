@@ -1,7 +1,12 @@
 package com.alandvgarcia.maplibretest
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
+import android.util.Property
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
@@ -16,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.alandvgarcia.maplibretest.ui.theme.MapLibreTestTheme
@@ -23,7 +29,16 @@ import com.mapbox.mapboxsdk.Mapbox
 import com.mapbox.mapboxsdk.camera.CameraPosition
 import com.mapbox.mapboxsdk.geometry.LatLng
 import com.mapbox.mapboxsdk.maps.MapView
+import com.mapbox.mapboxsdk.maps.MapboxMap
 import com.mapbox.mapboxsdk.maps.Style
+import com.mapbox.mapboxsdk.plugins.annotation.SymbolManager
+import com.mapbox.mapboxsdk.plugins.annotation.SymbolOptions
+import com.mapbox.mapboxsdk.style.layers.Property.ICON_ANCHOR_TOP
+import com.mapbox.mapboxsdk.style.layers.PropertyFactory
+import com.mapbox.mapboxsdk.style.layers.SymbolLayer
+import com.mapbox.mapboxsdk.utils.BitmapUtils
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,13 +67,13 @@ fun MapView() {
     val mapView = rememberMapViewWithLifecycle()
 
 
-   Scaffold(topBar = {  CenterAlignedTopAppBar(title = { Text("Map") }) }) {
-       Column(modifier = Modifier.padding(it)) {
+    Scaffold(topBar = { CenterAlignedTopAppBar(title = { Text("Map") }) }) {
+        Column(modifier = Modifier.padding(it)) {
             AndroidView(factory = {
                 mapView
             })
-       }
-   }
+        }
+    }
 }
 
 
@@ -82,6 +97,15 @@ private fun rememberMapViewWithLifecycle(
                         .build()
                     mapboxMap.cameraPosition = cameraPosition
                 }
+
+                mapboxMap.getStyle {
+                    val symbolManager = createSymbolManager(this, mapboxMap, it )
+                    configureCottonAnnotations(listOf(
+                        LatLng(-21.220721, -50.410465),
+                        LatLng(-21.221183, -50.410885),
+
+                        ), symbolManager)
+                }
             }
         }
     }
@@ -97,6 +121,77 @@ private fun rememberMapViewWithLifecycle(
     return mapView
 }
 
+
+fun createSymbolManager(
+    mapView: MapView,
+    mapboxMap: MapboxMap,
+    style: Style,
+): SymbolManager {
+//    if (style.getLayer(COTTON_LAYER) == null && style.getSource(COTTON_SOURCE) == null) {
+//
+//    }
+    createCottonSymbolLayer(style, mapView.context)
+    return SymbolManager(mapView, mapboxMap, style)
+}
+
+fun configureCottonAnnotations(
+    listCottons: List<LatLng>,
+    symbolManager: SymbolManager
+)  {
+    try {
+        val cottonsSymbols = listOf<LatLng>()
+        listCottons
+            .forEach { cottonItem ->
+                val symbol = symbolManager.create(
+                    SymbolOptions()
+                        .withLatLng(
+                            LatLng(
+                                cottonItem.latitude ?: 0.0,
+                                cottonItem.longitude ?: 0.0
+                            )
+                        )
+                        .withIconImage(COTTON_ICON_ID)
+                        .withIconSize(0.8f)
+
+                        .withTextField("Usina")
+                  //      .withDraggable(false)
+//                        .withTextColor(Color.BLACK.toString())
+//                        .withTextHaloColor(Color.BLACK.toString())
+//                        .withTextSize(16f)
+//                        //.withTextFont(arrayOf("Lato Black"))
+//                        .withTextAnchor(ICON_ANCHOR_TOP)
+//                        .withTextOffset(arrayOf(0f, -2.3f))
+                )
+            }
+
+        cottonsSymbols
+    } catch (e: Exception) {
+        Log.e("MapUtil", e.toString())
+    }
+}
+
+
+private const val COTTON_LAYER = "cotton_layer"
+private const val COTTON_SOURCE = "cotton_source"
+private const val COTTON_ICON_ID = "cotton_icon"
+
+private fun createCottonSymbolLayer(style: Style, context: Context) {
+    val drawable: Drawable? =
+        ContextCompat.getDrawable(
+            context,
+            com.mapbox.mapboxsdk.R.drawable.mapbox_marker_icon_default
+        )
+    val icon: Bitmap? = BitmapUtils.getBitmapFromDrawable(drawable)
+
+    icon?.also {
+        style.addImage(COTTON_ICON_ID, icon)
+//        val symbolLayer = SymbolLayer(COTTON_LAYER, COTTON_SOURCE)
+//        symbolLayer.setProperties(
+//            PropertyFactory.iconImage(COTTON_ICON_ID)
+//        )
+//        style.addLayer(symbolLayer)
+    }
+}
 
 
 private fun getMapLifecycleObserver(mapView: MapView): LifecycleEventObserver =
